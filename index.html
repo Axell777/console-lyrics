@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title> Console Lyrics </title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+        /* --- ESTILOS CYBER-RETRO MEJORADOS (MVVM) --- */
+        :root {
+            --bg-dark: #121212;
+            --case-color: #2a2a35;
+            --screen-bg: #051505;
+            --neon-green: #39ff14;
+            --neon-cyan: #0ff;
+            --button-base: #3f3f4e;
+            --button-active: #2a2a35;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: white;
+            font-family: 'Share Tech Mono', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-image: radial-gradient(circle, #2a2a35 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        #hardware-player {
+            background-color: var(--case-color);
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 
+                10px 10px 30px rgba(0,0,0,0.8),
+                inset 2px 2px 5px rgba(255,255,255,0.1);
+            width: 400px;
+            border: 2px solid #111;
+        }
+
+        /* Pantalla LCD: Pantalla Completa para Letras */
+        .lcd-screen {
+            background-color: var(--screen-bg);
+            border: 4px solid #111;
+            border-radius: 8px;
+            padding: 15px;
+            height: 150px; /* Pantalla más alta para letras */
+            box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .lcd-screen::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.3) 2px, rgba(0,0,0,0.3) 4px);
+            pointer-events: none;
+        }
+
+        .status-bar {
+            color: var(--neon-cyan);
+            font-size: 10px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        /* Bloque de Letras Sincronizadas */
+        .lyrics-container {
+            color: var(--neon-green);
+            font-size: 14px;
+            line-height: 1.4;
+            height: 120px;
+            overflow-y: auto;
+            text-shadow: 0 0 3px var(--neon-green);
+        }
+
+        .lyrics-line {
+            display: flex;
+            gap: 10px;
+            color: #888;
+        }
+
+        .highlight-line {
+            color: white;
+            font-weight: bold;
+            text-shadow: 0 0 5px var(--neon-cyan);
+        }
+
+        /* Botones de Control Consolidados (3 total) */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+
+        .btn-hardware {
+            flex: 1;
+            background-color: var(--button-base);
+            color: white;
+            border: 2px solid #111;
+            border-radius: 5px;
+            padding: 15px 0;
+            font-family: inherit;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #111;
+            transition: all 0.1s;
+        }
+
+        .btn-hardware:active {
+            box-shadow: 0 0px 0 #111;
+            transform: translateY(5px);
+            background-color: var(--button-active);
+            color: var(--neon-cyan);
+        }
+
+        /* Lista de Reproducción */
+        .playlist-box {
+            background-color: #1a1a24;
+            border: 2px solid #111;
+            border-radius: 5px;
+            padding: 10px;
+            height: 100px;
+            overflow-y: auto;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+        }
+
+        .track {
+            padding: 6px;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 1px dashed #333;
+            font-size: 12px;
+        }
+
+        .track:hover { color: white; background: rgba(255,255,255,0.05); }
+        .track.active { color: var(--neon-cyan); font-weight: bold; }
+
+        #yt-player { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="hardware-player">
+        <div class="lcd-screen">
+            <div class="status-bar">
+                <span>PLAYING</span>
+                <span>TRK 01</span>
+            </div>
+            <div class="lyrics-container" id="lyrics-content">
+                </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-hardware" onclick="Controller.prev()">|◀</button>
+            <button class="btn-hardware" onclick="Controller.togglePlay()">▶/❚❚</button>
+            <button class="btn-hardware" onclick="Controller.next()">▶|</button>
+        </div>
+
+        <div class="playlist-box" id="playlist-container">
+            </div>
+    </div>
+
+    <div id="yt-player"></div>
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <script>
+        /* --- 1. MODELO (Datos) --- */
+        const Model = {
+            playlist: [
+                { id: 'bg64AFnRnkc', title: 'Caro - Bad Bunny', lyrics: `[0:00]  (Intro Instrumental)
+[0:05]  - Sí, quedo bien...
+[0:10]  >> SÓLO QUE PODEMOS MEJORAR UN POCO <<
+[0:15]  - Solo necesito que pongas...
+[0:20]  - Tres botones, porque tenemos cuatro...
+[0:25]  - Y podemos poner ese de play y stop juntos...
+[0:30]  - Y el texto que sale podemos poner la letra??` },
+                { id: 'bg64AFnRnkc', title: 'SYNTHWAVE CYBERPUNK MIX', lyrics: `[0:00] (Neon Intro)
+[0:10] Running in the night,
+[0:15] Synthesizer flight,
+[0:20] Cyberpunk delight.` },
+                { id: 'dQw4w9WgXcQ', title: 'RICK ASTLEY - NEVER GONNA GIVE YOU UP', lyrics: `[0:00] (Synth Pop Intro)
+[0:10] We're no strangers to love,
+[0:15] You know the rules and so do I...` }
+            ],
+            currentIndex: 0,
+            isReady: false
+        };
+
+        /* --- 2. VISTA (Interfaz) --- */
+        const View = {
+            renderPlaylist() {
+                const container = document.getElementById('playlist-container');
+                container.innerHTML = '';
+                Model.playlist.forEach((track, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'track' + (index === Model.currentIndex ? ' active' : '');
+                    div.innerText = `${index + 1}. ${track.title}`;
+                    div.onclick = () => Controller.playTrack(index);
+                    container.appendChild(div);
+                });
+            },
+            
+            updateLyricsDisplay(currentTime) {
+                const container = document.getElementById('lyrics-content');
+                container.innerHTML = ''; // Limpiar letras antiguas
+                const lines = Model.playlist[Model.currentIndex].lyrics.split('\n');
+                let foundHighlight = false;
+
+                lines.forEach((line) => {
+                    const lyricData = this.parseLyricLine(line);
+                    if (lyricData) {
+                        const isHighlighted = !foundHighlight && lyricData.time <= currentTime;
+                        const lineDiv = document.createElement('div');
+                        lineDiv.className = 'lyrics-line' + (isHighlighted ? ' highlight-line' : '');
+                        
+                        const timeSpan = document.createElement('span');
+                        timeSpan.innerText = lyricData.timeCode;
+                        
+                        const textSpan = document.createElement('span');
+                        textSpan.innerText = lyricData.text;
+                        
+                        lineDiv.appendChild(timeSpan);
+                        lineDiv.appendChild(textSpan);
+                        container.appendChild(lineDiv);
+                        
+                        if (isHighlighted) foundHighlight = true; // Solo una línea resaltada
+                    }
+                });
+            },
+
+            parseLyricLine(line) {
+                const match = line.match(/^\[(\d+):(\d+)\](.*)$/);
+                if (match) {
+                    const minutes = parseInt(match[1]);
+                    const seconds = parseInt(match[2]);
+                    return {
+                        time: (minutes * 60) + seconds,
+                        timeCode: `[${match[1]}:${match[2]}]`,
+                        text: match[3].trim()
+                    };
+                }
+                return null;
+            }
+        };
+
+        /* --- 3. CONTROLADOR (Lógica) --- */
+        const Controller = {
+            player: null,
+            timeUpdateInterval: null,
+
+            init(ytPlayerObject) {
+                this.player = ytPlayerObject;
+                Model.isReady = true;
+                this.loadTrack(Model.currentIndex);
+            },
+
+            loadTrack(index) {
+                if (!Model.isReady) return;
+                Model.currentIndex = index;
+                this.player.loadVideoById(Model.playlist[Model.currentIndex].id);
+                this.player.stopVideo(); // Carga pero no reproduce
+                View.renderPlaylist();
+                View.updateLyricsDisplay(0); // Mostrar letras en t=0
+            },
+
+            togglePlay() {
+                if (!Model.isReady) return;
+                const state = this.player.getPlayerState();
+                if (state === 1) { // 1 es Reproduciendo
+                    this.pause();
+                } else {
+                    this.play();
+                }
+            },
+
+            play() {
+                this.player.playVideo();
+                this.startTimeUpdate();
+                this.play();
+            },
+
+            pause() {
+                this.player.pauseVideo();
+                this.stopTimeUpdate();
+                // Opcional: Actualizar el estado de la vista
+            },
+
+            next() {
+                let nextIndex = Model.currentIndex + 1;
+                if (nextIndex >= Model.playlist.length) nextIndex = 0;
+                this.playTrack(nextIndex);
+            },
+
+            prev() {
+                let prevIndex = Model.currentIndex - 1;
+                if (prevIndex < 0) prevIndex = Model.playlist.length - 1;
+                this.playTrack(prevIndex);
+            },
+
+            startTimeUpdate() {
+                this.stopTimeUpdate(); // Prevenir múltiples intervalos
+                this.timeUpdateInterval = setInterval(() => {
+                    if (this.player && this.player.getPlayerState() === 1) {
+                        const currentTime = this.player.getCurrentTime();
+                        View.updateLyricsDisplay(currentTime);
+                    }
+                }, 1000); // Actualizar cada segundo
+            },
+
+            stopTimeUpdate() {
+                if (this.timeUpdateInterval) clearInterval(this.timeUpdateInterval);
+            }
+        };
+
+        function onYouTubeIframeAPIReady() {
+            let ytPlayer = new YT.Player('yt-player', {
+                height: '0',
+                width: '0',
+                events: {
+                    'onReady': function() {
+                        Controller.init(ytPlayer);
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
